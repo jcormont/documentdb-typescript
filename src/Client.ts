@@ -137,7 +137,8 @@ export class Client {
 
     /** @internal Log a message; always returns true */
     public log(message) {
-        console.log(`[${process.pid}]{${this._uid}} ${Date.now()} ${message}`);
+        if (this.enableConsoleLog)
+            console.log(`[${process.pid}]{${this._uid}} ${Date.now()} ${message}`);
         return true;
     }
 
