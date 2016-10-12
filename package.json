@@ -1,0 +1,24 @@
+{
+  "name": "documentdb-typescript",
+  "version": "0.0.1",
+  "description": "TypeScript API for Microsoft DocumentDB",
+  "main": "index.js",
+  "typings": "./typings/index.d.ts",
+  "scripts": {
+    "build": "tsc -p src",
+    "prepublish": "tsc -p src"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcormont/documentdb-typescript.git"
+  },
+  "author": "Jelmer Cormont",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jcormont/documentdb-typescript/issues"
+  },
+  "homepage": "https://github.com/jcormont/documentdb-typescript#readme",
+  "dependencies": {
+    "documentdb": "^1.10.0"
+  }
+}
