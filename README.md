@@ -11,6 +11,7 @@ This module was written with the following goals in mind:
 
 - Streamline common DocumentDB use cases;
 - Enable a better developer experience with accurate Intellisense;
+- Reduce clutter by adding classes and combining methods;
 - Use idiomatic TypeScript 2 (es6 for Node JS) internally and externally;
 - Enable asynchronous programming with `async/await` and/or Promises (native Node JS).
 
@@ -50,7 +51,7 @@ This module exports only the following symbols:
 - `concurrencyLimit` (number): controls how many requests should be outstanding *globally* at any time; defaults to 25.
 
 *Where is Document?* &mdash;
-There is no 'Document' class because documents are really just plain JavaScript objects (of type `any`), which may or may not have some extra properties (such as `_self`) depending on where they come from, and are very hard to pin down as such. Also, the results of a query may or may not be full documents, which makes it impossible to predict exact return types. Adding another abstraction layer (à la the .NET API with its set- / getPropertyValue methods) would just mean more inconvenience.
+There is no 'Document' class because documents are really just plain JavaScript objects (of type `any`), which may or may not have some extra properties (such as `_self`) depending on where they come from, and are very hard to pin down as such. Also, the results of a query may or may not be full documents, which makes it impossible to predict exact return types. Adding another abstraction layer (à la the .NET API with its set- / getPropertyValue methods) doesn't seem like the right thing to do in JavaScript code.
 
 ## `Client`
 Start here if you need to work with multiple databases, or set advanced connection options.
@@ -117,8 +118,7 @@ async function main(url, masterKey) {
     // these are all the same:
     var coll = new Collection("test", db);
     var coll2 = new Collection("test", "sample", client);
-    var coll3 = new Collection("test", "sample",
-        url, masterKey);
+    var coll3 = new Collection("test", "sample", url, masterKey);
     
     // create everything if necessary
     await coll.openOrCreateDatabaseAsync();
@@ -175,8 +175,7 @@ async function main(url, masterKey) {
     // update a document if not changed in DB,
     // using _etag property which must exist
     doc.foo = "bla";
-    doc = await coll.storeDocumentAsync(doc,
-        StoreMode.UpdateOnlyIfNoChange);
+    doc = await coll.storeDocumentAsync(doc, StoreMode.UpdateOnlyIfNoChange);
     
     // upsert a document (twice, without errors)
     var doc2: any = { id: "abc", foo: "bar" };
@@ -197,8 +196,7 @@ There are a number of ways to find a document or a set of documents in a collect
 ```typescript
 // Example: find document(s)
 async function main(url, masterKey) {
-    var coll = await new Collection(
-        "test", "sample", url, masterKey)
+    var coll = await new Collection("test", "sample", url, masterKey)
         .openOrCreateDatabaseAsync();
 
     // find a document by ID (fails if not found)
@@ -221,8 +219,7 @@ async function main(url, masterKey) {
 
     // find a set of documents (see below)
     var stream = coll.queryDocuments();  // <= all
-    var stream2 = coll.queryDocuments(
-        "select * from c");  // same
+    var stream2 = coll.queryDocuments("select * from c");  // same
     var stream3 = coll.queryDocuments({
         query: "select * from c where c.foo = @foo",
         parameters: [
@@ -238,8 +235,7 @@ The `queryDocuments` method on the `Collection` class is one of the few methods 
 ```typescript
 // Example: iterate over query results
 async function main(url, masterKey) {
-    var coll = await new Collection(
-        "test", "sample", url, masterKey)
+    var coll = await new Collection("test", "sample", url, masterKey)
         .openOrCreateDatabaseAsync();
 
     // load all documents into an array
