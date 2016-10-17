@@ -48,7 +48,7 @@ This module exports only the following symbols:
 - `Collection` class: represents a collection, and contains methods for dealing with documents.
 - `DocumentStream` class: contains methods for reading query results (used as a return type only).
 - `StoreMode` enum: lists different modes of storing documents in a collection.
-- `concurrencyLimit` (number): controls how many requests should be outstanding *globally* at any time; defaults to 25.
+- `concurrencyLimit` (number): controls how many requests should be outstanding *globally* at any time; defaults to 25. [ISSUE #1 in the current version: this number cannot be set]
 
 *Where is Document?* &mdash;
 There is no 'Document' class because documents are really just plain JavaScript objects (of type `any`), which may or may not have some extra properties (such as `_self`) depending on where they come from, and are very hard to pin down as such. Also, the results of a query may or may not be full documents, which makes it impossible to predict exact return types. Adding another abstraction layer (à la the .NET API with its set- / getPropertyValue methods) doesn't seem like the right thing to do in JavaScript code.
