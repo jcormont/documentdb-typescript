@@ -174,13 +174,13 @@ export class Collection {
                 break;
             case StoreMode.CreateOnly:
                 tryStore = (callback) =>
-                    this.database.client.log(data.id ? "Creating document: " + data.id : "Creating document: (auto generated ID)") &&
+                    this.database.client.log("Creating document: " + (data.id !== undefined ? data.id : "(auto generated ID)")) &&
                     this.database.client.documentClient.createDocument(this._self,
                         data, undefined, callback);
                 break;
             default:
                 tryStore = (callback) =>
-                    this.database.client.log(data.id ? "Upserting document: " + data.id : "Upserting document: (auto generated ID)") &&
+                    this.database.client.log("Upserting document: " + (data.id !== undefined ? data.id : "(auto generated ID)")) &&
                     this.database.client.documentClient.upsertDocument(this._self,
                         data, undefined, callback);
         }
