@@ -18,6 +18,8 @@ This module was written with the following goals in mind:
 ### Project Status
 I just needed something quick, so at this point parts of the DocumentDB feature set are still missing. If your app needs stored procedures, or users and permissions, for example, then please add to this code (preferably as new classes). Pull requests are greatly appreciated!
 
+Tests are sorely needed as well. Perhaps some of the tests can be ported over from DocumentDB itself.
+
 ## Installation
 Use `npm` to install this module (TypeScript optional):
 
@@ -48,7 +50,6 @@ This module exports only the following symbols:
 - `Collection` class: represents a collection, and contains methods for dealing with documents.
 - `DocumentStream` class: contains methods for reading query results (used as a return type only).
 - `StoreMode` enum: lists different modes of storing documents in a collection.
-- `concurrencyLimit` (number): controls how many requests should be outstanding *globally* at any time; defaults to 25. [ISSUE #1 in the current version: this number cannot be set]
 
 *Where is Document?* &mdash;
 There is no 'Document' class because documents are really just plain JavaScript objects (of type `any`), which may or may not have some extra properties (such as `_self`) depending on where they come from, and are very hard to pin down as such. Also, the results of a query may or may not be full documents, which makes it impossible to predict exact return types. Adding another abstraction layer (à la the .NET API with its set- / getPropertyValue methods) doesn't seem like the right thing to do in JavaScript code.
@@ -60,6 +61,8 @@ Start here if you need to work with multiple databases, or set advanced connecti
 // Example: open a connection and find all databases
 async function main(url, masterKey) {
     var client = new Client(url, masterKey);
+
+    // enable logging of all operations to the console
     client.enableConsoleLog = true;
 
     // dump the account information
@@ -76,7 +79,9 @@ async function main(url, masterKey) {
 }
 ```
 
-The original DocumentClient from the `documentdb` module is kept in the `documentClient` property, after the `openAsync` method is called.
+The original DocumentClient from the `documentdb` module is kept in the `documentClient` property, after the `openAsync` method is called:
+
+A static property `Client.concurrencyLimit` (number) controls how many requests may be outstanding *globally* at any time; this defaults to 25. Further requests are held internally (without timing out) until a pending request completes. You may want to increase this number if you are performing a high volume of low-cost operations such as deletions.
 
 ## `Database`
 Start here if you need to list all collections in a database, or delete it from the account. Nothing else here.

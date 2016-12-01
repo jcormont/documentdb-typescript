@@ -1,5 +1,4 @@
-/** Maximum number of concurrent pending requests */
-export var concurrencyLimit = 25;
+import { Client } from "./Client";
 
 /** Current number of pending requests */
 var _pending = 0;
@@ -13,7 +12,7 @@ export function curryPromise<T>(f: Function, timeout = 60000, maxRetries = 0, re
         return new Promise(function exec(resolve, reject) {
             if (done) return;
             if (!started) {
-                if (_pending >= concurrencyLimit) {
+                if (_pending >= Client.concurrencyLimit) {
                     setTimeout(exec, retryTimer || 100, resolve, reject);
                     return;
                 }

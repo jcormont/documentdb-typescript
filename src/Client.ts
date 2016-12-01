@@ -21,6 +21,9 @@ export class Client {
         this.authenticationOptions = { masterKey };
     }
 
+    /** Global concurrency limit for all server requests */
+    public static concurrencyLimit = 25;
+
     /** Set to true to log all requests to the console */
     public enableConsoleLog = false;
 
