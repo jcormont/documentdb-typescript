@@ -1,10 +1,12 @@
-# DocumentDB TypeScript API
+# Azure DocumentDB TypeScript API
 
-This Node module provides the 'missing' TypeScript 2 API for Microsoft's awesome SQL-queried schema-free Cloud NoSQL database, DocumentDB.
+This Node.js module provides the 'missing' TypeScript 2 API for Microsoft's awesome SQL-queried schema-free NoSQL database in the Azure cloud, DocumentDB.
 
-**No TypeScript required** &mdash; you can use this module with plain JavaScript too, and enjoy enhanced Intellisense in an editor that supports TypeScript 2 definition files, such as VS Code.
+Refer to the DocumentDB documentation here: https://docs.microsoft.com/en-us/azure/documentdb/
 
-**NOTE:** The author of this module is not affiliated with Microsoft.
+**No TypeScript required** &mdash; you can use this module with plain JavaScript too (ES3, ES5, or ES6 aka ES2015 and whatever comes after), and enjoy enhanced Intellisense in an editor that supports TypeScript 2 definition files, such as VS Code.
+
+> **NOTE:** The author of this module is not affiliated with Microsoft, Azure, or Document DB.
 
 ### Goals
 This module was written with the following goals in mind:
