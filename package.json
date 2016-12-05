@@ -1,6 +1,6 @@
 {
   "name": "documentdb-typescript",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "TypeScript API for Microsoft Azure DocumentDB",
   "main": "index.js",
   "typings": "./typings/index.d.ts",
