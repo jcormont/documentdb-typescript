@@ -9,6 +9,6 @@
         "noUnusedLocals": true,
         "noUnusedParameters": true,
         "stripInternal": true,
-        "outDir": "../js"
+        "outDir": "../dist"
     }
 }

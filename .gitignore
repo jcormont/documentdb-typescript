@@ -1,6 +1,6 @@
 # Do not store transpiler output
-typings
-js
+typings/
+dist/
 
 # Logs
 logs
