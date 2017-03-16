@@ -4,6 +4,8 @@
         "declarationDir": "../typings",
         "target": "es6",
         "module": "commonjs",
+        "strictNullChecks": true,
+        "noImplicitAny": true,
         "noImplicitReturns": true,
         "noImplicitThis": true,
         "noUnusedLocals": true,

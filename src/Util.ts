@@ -4,11 +4,12 @@ import { Client } from "./Client";
 var _pending = 0;
 
 /** Return a curried version of given function that appends a callback as a last parameter, which rejects or resolves a promise; the promise is returned immediately; also handles DocumentDB errors when possible */
-export function curryPromise<T>(f: Function, timeout = 60000, maxRetries = 0, retryTimer?: number) {
+export function curryPromise<T>(f: Function, timeout = 60000,
+    maxRetries = 0, retryTimer?: number, retryOn404?: boolean) {
     return (...args: any[]): PromiseLike<T> => {
         // return Promise for result or error
         var started = false, done: any;
-        var retries = maxRetries, timeoutTimer: number;
+        var retries = maxRetries, timeoutTimer: any;
         return new Promise(function exec(resolve, reject) {
             if (done) return;
             if (!started) {
@@ -33,33 +34,37 @@ export function curryPromise<T>(f: Function, timeout = 60000, maxRetries = 0, re
             }
             function clearTimeoutTimer() {
                 clearTimeout(timeoutTimer);
-                timeoutTimer = -1;
+                timeoutTimer = undefined;
             }
             var retried = false;
-            function retry() {
+            function retry(err?: any, headers?: any) {
                 if (retried) return;
                 retried = true;
                 clearTimeoutTimer();
+                var t = retryTimer || 100;
+                if (err && err.code === 429 &&
+                    headers && headers["x-ms-retry-after-ms"])
+                    t = parseFloat(headers["x-ms-retry-after-ms"]);
                 setTimeout(exec, retryTimer || 100, resolve, reject);
             }
             setTimeoutTimer();
 
             // append own callback
-            args.push((err, result) => {
+            args.push((err: any, result: any, headers?: any) => {
                 if (err) {
                     // retry or reject
-                    if (err.code != 400 && err.code != 401 &&
-                        err.code != 403 && err.code != 404 &&
-                        err.code != 409 && err.code != 412 &&
-                        err.code != 413 && retries-- > 0) {
-                        retry();
+                    if (err.code !== 400 && err.code !== 401 &&
+                        err.code !== 403 && (retryOn404 || err.code !== 404) &&
+                        err.code !== 409 && err.code !== 412 &&
+                        err.code !== 413 && retries-- > 0) {
+                        retry(err, headers);
                     }
                     else {
-                        var error: Error, body: any;
+                        var error: Error | undefined, body: any;
                         try { body = JSON.parse(err.body) } catch (all) { }
                         if (body) {
                             error = new Error(body.message || "Database error");
-                            error["code"] = err.code;
+                            (<any>error).code = err.code;
                             error.name = body.code;
                         }
                         reject(error || err);

@@ -1,3 +1,4 @@
+import * as _DocumentDB from "./_DocumentDB";
 import { Client } from "./Client";
 import { curryPromise, sleepAsync } from "./Util";
 import { Collection } from "./Collection";
@@ -30,15 +31,20 @@ export class Database {
     /** The client used for all operations */
     public readonly client: Client;
 
+    /** The partial resource URI for this database, i.e. `"/dbs/..."` */
+    public get path() {
+        return this._self || "dbs/" + encodeURIComponent(this.id) + "/";
+    }
+
     /** Open and validate the connection, check that this database exists */
     public async openAsync(maxRetries?: number) {
         if (this._self) return this;
         await this.client.openAsync(maxRetries);
 
         // find this database's self link from client's list of databases
-        var dbs = await this.client.listDatabasesAsync();
+        var dbs = await this.client.listDatabasesAsync(false, maxRetries);
         dbs.some(r => (r.id === this.id ? !!(this._self = r._self) : false));
-        
+
         if (!this._self) throw new Error("Database does not exist: " + this.id);
         return this;
     }
@@ -72,28 +78,32 @@ export class Database {
     }
 
     /** Get a list of Collection instances for this database */
-    public async listCollectionsAsync() {
-        await this.openAsync();
-        let tryListAll = (callback) =>
+    public async listCollectionsAsync(maxRetries?: number, options?: _DocumentDB.FeedOptions) {
+        await this.openAsync(maxRetries);
+
+        // get all collections using readCollections
+        let tryListAll = (callback: (err: any, result: any) => void) =>
             this.client.log("Reading collections in " + this.id) &&
-            this.client.documentClient.readCollections(this._self)
+            this.client.documentClient.readCollections(this._self!, options)
                 .toArray(callback);
-        var resources = await curryPromise(tryListAll, this.client.timeout)();
-        return (<any[]>resources).map(r =>
-            new Collection(r.id, this, r._self));
+        var resources = await curryPromise(tryListAll, this.client.timeout, maxRetries)();
+
+        // map resources to Collection instances
+        return (<any[]>resources).map(r => new Collection(r.id, this, r._self));
     }
 
     /** Delete this database */
-    public async deleteAsync() {
-        await this.openAsync();
-        let tryDelete = (callback) =>
+    public async deleteAsync(maxRetries?: number, options?: _DocumentDB.RequestOptions) {
+        await this.openAsync(maxRetries);
+
+        // use deleteDatabase to delete the database (duh...)
+        let tryDelete = (callback: (err: any, result: any) => void) =>
             this.client.log("Deleting database: " + this.id) &&
-            this.client.documentClient.deleteDatabase(this._self,
-                undefined, callback);
+            this.client.documentClient.deleteDatabase(this._self!, options, callback);
         await curryPromise(tryDelete, this.client.timeout)();
         delete this._self;
     }
 
     /** @internal Self link */
-    private _self: string;
+    private _self?: string;
 }

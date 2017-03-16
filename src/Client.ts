@@ -1,12 +1,6 @@
-import { _DocumentDB } from "./_DocumentDB";
+import * as _DocumentDB from "./_DocumentDB";
 import { curryPromise, sleepAsync } from "./Util";
 import { Database } from "./Database";
-
-// get to the native DocumentDB client constructor
-declare var require, process;
-const documentdb = require("documentdb");
-const DocumentClient: _DocumentDB.DocumentClient_Ctor =
-    documentdb.DocumentClient;
 
 /** List of opened/opening clients for specific endpoint/key combinations */
 var _openClients = new Map<string, Client>();
@@ -16,7 +10,7 @@ var _uid = 1;
 
 /** Represents a DocumentDB endpoint */
 export class Client {
-    constructor(url?: string, masterKey?: string) {
+    constructor(url?: string, masterKey = "<no_key>") {
         this.url = url || "";
         this.authenticationOptions = { masterKey };
     }
@@ -42,8 +36,15 @@ export class Client {
     /** The consistency level (string: "Strong" | "BoundedStaleness" | "Session" | "Eventual") used for the connection to this endpoint, if specified */
     public consistencyLevel: _DocumentDB.ConsistencyLevel | undefined;
 
-    /** The native DocumentClient instance, if opened */
-    public get documentClient() { return this._client };
+    /** The native DocumentClient instance; throws an error if this client is currently not connected (check using .isOpen, or await .openAsync() first) */
+    public get documentClient(): _DocumentDB.DocumentClient {
+        if (this._closed) throw new Error("Client already closed");
+        if (!this._client) throw new Error("Document DB client is not connected");
+        return this._client;
+    }
+
+    /** Returns true if this client is currently connected through a native DocumentClient instance */
+    public get isOpen() { return !!this._client && !this._closed }
 
     /** Connect to the endpoint represented by this client and validate the connection, unless already connected */
     public openAsync(maxRetries = 3): PromiseLike<any> {
@@ -56,26 +57,26 @@ export class Client {
             JSON.stringify(this.connectionPolicy) + ":" +
             this.consistencyLevel;
         if (_openClients.has(key)) {
-            var other = _openClients.get(key);
+            var other = _openClients.get(key)!;
             this._client = other._client;
             this._databaseResources = other._databaseResources;
-            return this._open = other._open;
+            return this._open = other._open!;
         }
         _openClients.set(key, this);
 
         // create a new DocumentClient instance
-        this._client = new DocumentClient(this.url,
+        this._client = new _DocumentDB.DocumentClient(this.url,
             this.authenticationOptions, this.connectionPolicy,
             this.consistencyLevel);
 
         // return a promise that resolves when databases are read
         return this._open = new Promise(resolve => {
-            let tryConnect = (callback) =>
+            let tryConnect = (callback: (err: any, result: any) => void) =>
                 this.log("Connecting to " + this.url) &&
-                this.documentClient.readDatabases({ maxItemCount: 1000 })
+                this._client!.readDatabases({ maxItemCount: 1000 })
                     .toArray(callback);
             resolve(curryPromise(tryConnect, this.timeout, maxRetries)()
-                .then(dbs => { this._resolve_databases(dbs) }));
+                .then(dbs => { this._resolve_databases!(dbs) }));
         });
     }
 
@@ -90,11 +91,11 @@ export class Client {
                 });
 
             // read all databases again and resolve promise
-            let tryReadDBs = (callback) =>
+            let tryReadDBs = (callback: (err: any, result: any) => void) =>
                 this.log("Reading list of databases") &&
-                this.documentClient.readDatabases({ maxItemCount: 1000 })
+                this._client!.readDatabases({ maxItemCount: 1000 })
                     .toArray(callback);
-            this._resolve_databases(
+            this._resolve_databases!(
                 await curryPromise(tryReadDBs, this.timeout, maxRetries)());
         }
         var databaseResources = await this._databaseResources;
@@ -103,12 +104,13 @@ export class Client {
     }
 
     /** @internal Create a database (and add it to the list returned by listDatabasesAsync) */
-    public async createDatabaseAsync(id: string) {
+    public async createDatabaseAsync(id: string, maxRetries?: number,
+        options?: _DocumentDB.RequestOptions) {
         await this.openAsync();
-        let tryCreateDB = (callback) =>
+        let tryCreateDB = (callback: (err: any, result: any) => void) =>
             this.log("Creating database: " + id) &&
-            this._client.createDatabase({ id }, undefined, callback);
-        await curryPromise(tryCreateDB, this.timeout)();
+            this._client!.createDatabase({ id }, options, callback);
+        await curryPromise(tryCreateDB, this.timeout, maxRetries)();
 
         // reload all database resources until the created DB appears
         // (this is to allow for consistency less than session consistency)
@@ -123,14 +125,14 @@ export class Client {
 
     /** Get account information */
     public async getAccountInfoAsync() {
-        let tryGetInfo = (callback) =>
+        let tryGetInfo = (callback: (err: any, result: any) => void) =>
             this.log("Getting account info") &&
-            this.documentClient.getDatabaseAccount(callback);
+            this._client!.getDatabaseAccount(callback);
         return <_DocumentDB.DatabaseAccount>await curryPromise(
             tryGetInfo, this.timeout)();
     }
 
-    /** Remove the current connection; an attempt to open the same endpoint again in another instance will open and validate the connection again */
+    /** Remove the current connection; an attempt to open the same endpoint again in another instance will open and validate the connection again, but the current instance cannot be re-opened */
     public close() {
         this._closed = true;
         _openClients.forEach((client, key) => {
@@ -139,28 +141,28 @@ export class Client {
     }
 
     /** @internal Log a message; always returns true */
-    public log(message) {
+    public log(message: string): true {
         if (this.enableConsoleLog)
             console.log(`[${process.pid}]{${this._uid}} ${Date.now()} ${message}`);
         return true;
     }
 
     /** @internal List of databases found in the account, resolved if and when opened */
-    private _databaseResources = new Promise<_DocumentDB.Resource[]>(resolve => {
+    private _databaseResources = new Promise<_DocumentDB.DatabaseResource[]>(resolve => {
         this._resolve_databases = resolve;
     });
 
     /** @internal */
-    private _resolve_databases: (data) => void;
+    private _resolve_databases?: (data: any) => void;
 
     /** @internal */
-    private _open: PromiseLike<any>;
+    private _open?: PromiseLike<any>;
 
     /** @internal */
-    private _client: _DocumentDB.DocumentClient | null = null;
+    private _client?: _DocumentDB.DocumentClient;
 
     /** @internal */
-    private _closed: boolean;
+    private _closed?: boolean;
 
     /** @internal */
     private _uid = _uid++;

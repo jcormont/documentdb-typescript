@@ -1,8 +1,17 @@
-import { _DocumentDB } from "./_DocumentDB";
+import * as _DocumentDB from "./_DocumentDB";
 import { Database } from "./Database";
 import { Client } from "./Client";
 import { DocumentStream } from "./DocumentStream";
 import { curryPromise, sleepAsync } from "./Util";
+
+/** Global query ID, used to tag reads in the log */
+var _queryUID = 0;
+
+/** Modes that can be used for storing resources in a collection */
+export enum StoreMode { Upsert, CreateOnly, UpdateOnly, UpdateOnlyIfNoChange };
+
+/** Combined option objects for operations that may invoke multiple network calls */
+export type AllOptions = _DocumentDB.FeedOptions & _DocumentDB.RequestOptions;
 
 /** Represents a DocumentDB collection */
 export class Collection {
@@ -34,16 +43,22 @@ export class Collection {
     /** The database used for all operations */
     public readonly database: Database;
 
+    /** The partial resource URI for this database, i.e. `"/dbs/.../colls/..."` */
+    public get path() {
+        return this._self ||
+            "dbs/" + this.database.id + "/colls/" + encodeURIComponent(this.id);
+    }
+
     /** Open and validate the connection, check that this collection exists */
-    public async openAsync(maxRetries?: number) {
+    public async openAsync(maxRetries?: number, options?: AllOptions) {
         if (this._self) return this;
         await this.database.openAsync(maxRetries);
-        let tryGetCollection = (callback) =>
-            this.database.client.log("Reading collection " + this.id) &&
+        let tryGetCollection = (callback: (err: any, result: any) => void) =>
+            this.database.client.log("Reading collection " + this.path) &&
             this.database.client.documentClient.readCollection(
-                "dbs/" + this.database.id + "/colls/" + this.id,
-                undefined, callback);
-        var resource = await curryPromise(tryGetCollection,
+                this.path, options, callback);
+        var resource = await curryPromise<_DocumentDB.CollectionResource>(
+            tryGetCollection,
             this.database.client.timeout, maxRetries)();
         this._self = resource["_self"];
         return this;
@@ -52,33 +67,34 @@ export class Collection {
     /** Open and validate the connection, find or create collection resource (does not create the database) */
     public async openOrCreateAsync(createThroughput?: number,
         indexingPolicy?: _DocumentDB.IndexingPolicy,
-        defaultTtl?: number, maxRetries?: number) {
+        defaultTtl?: number, maxRetries?: number, options?: AllOptions) {
         if (this._self) return this;
         await this.database.openAsync(maxRetries);
-        var resource: {};
+        var resource: _DocumentDB.CollectionResource;
         try {
-            let tryGetCollection = (callback) =>
+            let tryGetCollection = (callback: (err: any, result: any) => void) =>
                 this.database.client.log("Reading collection " + this.id) &&
                 this.database.client.documentClient.readCollection(
-                    "dbs/" + this.database.id + "/colls/" + this.id,
-                    undefined, callback);
-            resource = await curryPromise(tryGetCollection,
+                    this.path, options, callback);
+            resource = await curryPromise<_DocumentDB.CollectionResource>(
+                tryGetCollection,
                 this.database.client.timeout, maxRetries)();
         }
         catch (err) {
             if (err.code == 404 /* not found */) {
                 // create the collection now
-                var data: _DocumentDB.CollectionResource = { id: this.id };
+                var data: any = { id: this.id };
                 if (indexingPolicy) data.indexingPolicy = indexingPolicy;
                 if (defaultTtl !== undefined) data.defaultTtl = defaultTtl;
                 try {
-                    let tryCreateCollection = (callback) =>
+                    let tryCreateCollection = (callback: (err: any, result: any) => void) =>
                         this.database.client.log("Creating collection " + this.id) &&
                         this.database.client.documentClient.createCollection(
-                            "dbs/" + this.database.id, data,
+                            this.database.path, data,
                             { offerThroughput: createThroughput },
                             callback);
-                    resource = await curryPromise(tryCreateCollection,
+                    resource = await curryPromise<_DocumentDB.CollectionResource>(
+                        tryCreateCollection,
                         this.database.client.timeout)();
                 }
                 catch (err) {
@@ -108,169 +124,299 @@ export class Collection {
     }
 
     /** Get offer (throughput provisioning) information */
-    public async getOfferInfoAsync() {
+    public async getOfferInfoAsync(maxRetries?: number, options?: AllOptions) {
         await this.openAsync();
-        let tryGetOffer = (callback) =>
+        let tryGetOffer = (callback: (err: any, result: any) => void) =>
             this.database.client.log("Getting offer info for " + this.id) &&
             this.database.client.documentClient.queryOffers({
                 query: "select * from root r where r.resource = @selflink",
                 parameters: [{ name: "@selflink", value: this._self }]
-            }).toArray(callback);
-        var offers: _DocumentDB.OfferResource[] = <any>
-            await curryPromise(tryGetOffer, this.database.client.timeout)();
+            }, options).toArray(callback);
+        var offers: any[] = await curryPromise<any>(
+            tryGetOffer, this.database.client.timeout, maxRetries)();
         if (!offers.length) throw new Error("Offer not found");
         this._offer = offers[0];
-        return JSON.parse(JSON.stringify(offers[0]));
+        return <_DocumentDB.OfferResource>JSON.parse(JSON.stringify(offers[0]));
     }
 
     /** Set provisioned throughput */
     public async setOfferInfoAsync(throughput: number) {
         await this.openAsync();
         if (!this._offer) await this.getOfferInfoAsync();
-        if (!this._offer.content || !this._offer.content.offerThroughput)
+        var offer = this._offer!;
+        if (!offer.content || !offer.content.offerThroughput)
             throw new Error("Unknown offer type");
-        this._offer.content.offerThroughput = throughput;
-        let trySetOffer = (callback) =>
+        offer.content.offerThroughput = throughput;
+        let trySetOffer = (callback: (err: any, result: any) => void) =>
             this.database.client.log("Setting offer info for " + this.id) &&
-            this.database.client.documentClient.replaceOffer(this._offer._self,
-                this._offer, callback);
-        this._offer = <any>await curryPromise(trySetOffer, this.database.client.timeout)();
+            this.database.client.documentClient.replaceOffer(
+                offer._self, offer, callback);
+        this._offer = await curryPromise<any>(trySetOffer,
+            this.database.client.timeout)();
     }
 
     /** Delete this collection */
-    public async deleteAsync() {
+    public async deleteAsync(maxRetries?: number, options?: AllOptions) {
         await this.openAsync();
-        let tryDelete = (callback) =>
+        let tryDelete = (callback: (err: any, result: any) => void) =>
             this.database.client.log("Deleting collection: " + this.id) &&
-            this.database.client.documentClient.deleteCollection(this._self,
-                undefined, callback);
-        await curryPromise(tryDelete, this.database.client.timeout)();
+            this.database.client.documentClient.deleteCollection(this._self!,
+                options, callback);
+        await curryPromise(tryDelete, this.database.client.timeout,
+            maxRetries, 500, true)();
         delete this._self;
     }
 
-    /** Create or update the document with given data; returns the stored data as a plain object, including meta properties such as `_etag` and `_self` */
-    public async storeDocumentAsync(data: _DocumentDB.DocumentResource,
-        mode?: StoreMode, maxRetries?: number):
-        Promise<_DocumentDB.ReadDocumentResource> {
+    /** Create or update the document with given data (must include an `.id` or `._self` property if store mode is `UpdateOnly`, and must also include an `_etag` property if store mode is `UpdateOnlyIfNoChange`); returns the stored data as a plain object, including meta properties such as `._etag` and `._self` */
+    public async storeDocumentAsync<T extends Partial<_DocumentDB.DocumentResource>>(
+        data: T,
+        mode?: StoreMode, maxRetries?: number, options?: AllOptions):
+        Promise<T & _DocumentDB.DocumentResource> {
         await this.openAsync();
-        if (!data) throw new TypeError();
-        var tryStore: (callback) => any, options: _DocumentDB.RequestOptions;
+        if (!(<any>data instanceof Object)) throw new TypeError();
+        var tryStore: (callback: (err: any, result: any) => void) => any;
         switch (mode) {
             case StoreMode.UpdateOnlyIfNoChange:
                 if (!data._etag) throw new Error("Document _etag missing");
-                options = {
+                options = Object.assign({
                     accessCondition: {
                         type: "IfMatch",
                         condition: data._etag
                     }
-                };
+                }, options);
             // continue with update...
             case StoreMode.UpdateOnly:
-                if (!data._self) throw new Error("Document _self missing");
+                if (data.id === undefined) throw new Error("Document ID missing");
                 tryStore = (callback) =>
                     this.database.client.log("Replacing document: " + data.id) &&
-                    this.database.client.documentClient.replaceDocument(data._self,
-                        data, options, callback);
+                    this.database.client.documentClient.replaceDocument(
+                        this._getDocURI(data),
+                        <any>data, options, callback);
                 break;
             case StoreMode.CreateOnly:
                 tryStore = (callback) =>
                     this.database.client.log("Creating document: " +
                         (data.id !== undefined && data.id !== "" ? data.id :
                             "(auto generated ID)")) &&
-                    this.database.client.documentClient.createDocument(this._self,
-                        data, undefined, callback);
+                    this.database.client.documentClient.createDocument(this._self!,
+                        data, options, callback);
                 break;
             default:
                 tryStore = (callback) =>
                     this.database.client.log("Upserting document: " +
                         (data.id !== undefined && data.id !== "" ? data.id :
                             "(auto generated ID)")) &&
-                    this.database.client.documentClient.upsertDocument(this._self,
-                        data, undefined, callback);
+                    this.database.client.documentClient.upsertDocument(this._self!,
+                        data, options, callback);
         }
-        return <_DocumentDB.ReadDocumentResource>
-            await curryPromise(tryStore, this.database.client.timeout, maxRetries)();
+        return await curryPromise<T & _DocumentDB.DocumentResource>(
+            tryStore, this.database.client.timeout, maxRetries)();
     }
 
     /** Find the document with given ID */
-    public async findDocumentAsync(id: string, maxRetries?: number):
-        Promise<_DocumentDB.ReadDocumentResource>;
-    /** Find the document with the same `id` property, or the first document with exactly the given properties if `id` is not set */
-    public async findDocumentAsync(properties: {}, maxRetries?: number): Promise<_DocumentDB.ReadDocumentResource>;
-    public async findDocumentAsync(obj: string | {}, maxRetries?: number) {
+    public async findDocumentAsync<ResultT extends {}>(id: string,
+        maxRetries?: number, options?: AllOptions):
+        Promise<ResultT & _DocumentDB.DocumentResource>;
+    /** Reload given document from the database using its `._self` property */
+    public async findDocumentAsync<ResultT extends {}>(doc: { _self: string },
+        maxRetries?: number, options?: AllOptions):
+        Promise<ResultT & _DocumentDB.DocumentResource>;
+    /** Find the document with the same `id` property as given object, or the latest document with exactly the same values for all given properties if `id` is not set */
+    public async findDocumentAsync<ResultT extends {}>(obj: Partial<ResultT>,
+        maxRetries?: number, options?: AllOptions):
+        Promise<ResultT & _DocumentDB.DocumentResource>;
+    public async findDocumentAsync(
+        obj: string | { id?: string, _self?: string, [p: string]: any },
+        maxRetries?: number, options?: any) {
+        await this.openAsync();
+
+        // read using readDocument if possible
+        if (typeof obj === "string" ||
+            obj && (typeof (<any>obj)._self === "string" ||
+                (typeof (<any>obj).id === "string"))) {
+            var docURI: string | undefined;
+            try { docURI = this._getDocURI(obj) } catch (all) { }
+            if (docURI) {
+                // if got a well-formed URI, go ahead (and retry on 404, for
+                // lower consistency modes)
+                let tryReload = (callback: (err: any, result: any) => void) =>
+                    this.database.client.log("Reading document " + docURI) &&
+                    this.database.client.documentClient.readDocument(
+                        docURI!, options, callback);
+                return await curryPromise<any>(tryReload,
+                    this.database.client.timeout, maxRetries, undefined, true)();
+            }
+            else if (typeof obj === "string") {
+                // select by ID property (e.g. when contains spaces)
+                obj = { id: obj };
+            }
+        }
+
+        // use queryDocuments with given query/properties
         var q: _DocumentDB.SqlQuery = {
             query: "select top 1 * from c where",
             parameters: []
         };
-        if (typeof obj === "string") {
-            // match single ID
-            q.query += " c.id = @id";
-            q.parameters.push({ name: "@id", value: obj });
-        }
-        else if (obj["id"]) {
-            // match single ID from object (discard other properties)
-            q.query += " c.id = @id";
-            q.parameters.push({ name: "@id", value: obj["id"] });
-        }
-        else {
-            if (obj instanceof Object) {
-                for (var prop in <{}>obj) {
-                    if (Object.prototype.hasOwnProperty.call(obj, prop)) {
-                        // add an exact match for this property
-                        if (q.parameters.length) q.query += " and";
-                        q.query += ` c.${prop} = @_${prop}_value`;
-                        q.parameters.push({
-                            name: "@_" + prop + "_value",
-                            value: obj[prop]
-                        });
-                    }
+        if (obj instanceof Object) {
+            for (var prop in <{}>obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+                    // add an exact match for this property
+                    if (q.parameters.length) q.query += " and";
+                    q.query += ` c.${prop} = @_${prop}_value`;
+                    q.parameters.push({
+                        name: "@_" + prop + "_value",
+                        value: obj[prop]
+                    });
                 }
             }
-            if (!q.parameters.length) q.query += " true";
-            q.query += " order by c._ts desc";
         }
+        if (!q.parameters.length) q.query += " true";
+
+        // sort by time stamp to get latest document first
+        q.query += " order by c._ts desc";
 
         // return a single resource
-        await this.openAsync();
-        let tryQuery = (callback) =>
+        let tryQuery = (callback: (err: any, result: any) => void) =>
             this.database.client.log("Querying collection " + this.id + ": " +
                 JSON.stringify(q)) &&
-            this.database.client.documentClient.queryDocuments(this._self, q)
-                .toArray(callback);
-        var results: _DocumentDB.DocumentResource[] = <any>
-            await curryPromise(tryQuery, this.database.client.timeout, maxRetries)();
+            this.database.client.documentClient.queryDocuments(
+                this._self!, q, options).toArray(callback);
+        var results = await curryPromise<any[]>(tryQuery,
+            this.database.client.timeout, maxRetries)();
         if (!results || !results.length)
             throw new Error("Resource not found");
         return results[0];
     }
 
-    /** Query documents in this collection using a SQL query string, or SQL query object (in the form `{ query: "...", parameters: [{ name: "@...", value: ... }, ...] }`), defaults to "select * from c"; returns an encapsulation of the query results that can be used to asynchronously load all results or process them one by one */
-    public queryDocuments(query: _DocumentDB.SqlQuery = "select * from c",
-        batchSize?: number) {
-        if (!this._self) throw new Error("Collection is not open yet");
-        var options: _DocumentDB.FeedOptions;
-        if (batchSize) options = { maxItemCount: batchSize };
-        return new DocumentStream(this,
-            this.database.client.documentClient.queryDocuments(this._self,
-                query, options));
+    /** Check if a document with given ID exists (without reading the document) */
+    public async existsAsync(id: string,
+        maxRetries?: number, options?: AllOptions): Promise<boolean>;
+    /** Check if a document with given properties exists (i.e. where _all_ own properties of the given object match exactly) */
+    public async existsAsync(obj: {},
+        maxRetries?: number, options?: AllOptions): Promise<boolean>;
+    public async existsAsync(
+        obj: string | { id?: string, _self?: string, [p: string]: any },
+        maxRetries?: number, options?: any) {
+        await this.openAsync();
+
+        // use queryDocuments with given ID or properties
+        var q: _DocumentDB.SqlQuery = {
+            query: "select value count(1) from c where",
+            parameters: []
+        };
+        if (typeof obj === "string") {
+            q.query += " c.id = @id";
+            q.parameters.push({ name: "@id", value: obj });
+        }
+        else if (obj instanceof Object) {
+            for (var prop in <{}>obj) {
+                if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+                    // add an exact match for this property
+                    if (q.parameters.length) q.query += " and";
+                    q.query += ` c.${prop} = @_${prop}_value`;
+                    q.parameters.push({
+                        name: "@_" + prop + "_value",
+                        value: obj[prop]
+                    });
+                }
+            }
+        }
+        if (!q.parameters.length) q.query += " true";
+
+        // run the query and return true only if count >= 1
+        let tryQuery = (callback: (err: any, result: any) => void) =>
+            this.database.client.log("Querying collection " + this.id + ": " +
+                JSON.stringify(q)) &&
+            this.database.client.documentClient
+                .queryDocuments(this._self!, q, options)
+                .toArray(callback);
+        var results = await curryPromise<any[]>(tryQuery,
+            this.database.client.timeout, maxRetries)();
+        return !!results && results[0] >= 1;
     }
 
-    /** Delete the given document (must have a _self property, e.g. an object passed to `storeDocumentAsync`, or the result of `findDocumentAsync`) */
-    public async deleteDocumentAsync(data: { id?: string, _self: string }, maxRetries?: number) {
+    /** Query documents in this collection using a SQL query string, or SQL query object (i.e. `{ query: "...", parameters: [{ name: "@...", value: ... }, ...] }`) */
+    public queryDocuments<ResultT>(query: _DocumentDB.SqlQuery, batchSize?: number):
+        DocumentStream<ResultT>;
+    /** Query documents in this collection using a SQL query string, or SQL query object (i.e. `{ query: "...", parameters: [{ name: "@...", value: ... }, ...] }`) */
+    public queryDocuments<ResultT>(query: _DocumentDB.SqlQuery, options?: AllOptions):
+        DocumentStream<ResultT>;
+    /** Query all documents in this collection */
+    public queryDocuments<ResultT extends {}>(query?: undefined, batchSize?: number):
+        DocumentStream<ResultT & _DocumentDB.DocumentResource>;
+    /** Query all documents in this collection */
+    public queryDocuments<ResultT extends {}>(query?: undefined, options?: AllOptions):
+        DocumentStream<ResultT & _DocumentDB.DocumentResource>;
+    public queryDocuments(query?: _DocumentDB.SqlQuery, options?: number | AllOptions) {
+        if (typeof options === "number") options = { maxItemCount: options };
+        var uid = ++_queryUID;
+        if (query === undefined) {
+            // use readDocuments to get all documents
+            return DocumentStream.create<any>(this, uid, this.openAsync().then(() =>
+                this.database.client.log(
+                    `[${uid}>>] Reading all documents from ${this.id}`) &&
+                this.database.client.documentClient.readDocuments(
+                    this._self!, <any>options)));
+        }
+        else {
+            // submit given query
+            return DocumentStream.create<any>(this, uid, this.openAsync().then(() =>
+                this.database.client.log(
+                    `[${uid}>>] Querying collection ${this.id}: ` +
+                    JSON.stringify(query)) &&
+                this.database.client.documentClient.queryDocuments(
+                    this._self!, query, <any>options)));
+        }
+    }
+
+    /** Delete the document with given ID */
+    public async deleteDocumentAsync(id: string,
+        maxRetries?: number, options?: AllOptions): Promise<void>;
+    /** Delete the given document (must have a `_self` property, e.g. the result of `storeDocumentAsync` or `findDocumentAsync`, OR a valid `id` property) */
+    public async deleteDocumentAsync(doc: { _self: string } | { id: string },
+        maxRetries?: number, options?: AllOptions): Promise<void>;
+    public async deleteDocumentAsync(v: string | { id?: string, _self?: string },
+        maxRetries?: number, options?: AllOptions) {
         await this.openAsync();
-        let tryDelete = (callback) =>
-            this.database.client.log("Deleting: " + (data.id || data._self)) &&
-            this.database.client.documentClient.deleteDocument(data._self,
-                undefined, callback);
-        await curryPromise(tryDelete, this.database.client.timeout, maxRetries)();
+        var id = typeof v === "string" ? v : v.id;
+        var docURI: string | undefined;
+        try { docURI = this._getDocURI(v) } catch (all) { }
+        if (!docURI) {
+            // ID may contain invalid characters, find _self instead
+            var obj = await this.queryDocuments<{ _self: string }>({
+                query: "select c._self from c where c.id = @id",
+                parameters: [{ name: "@id", value: id }]
+            }, options).read();
+            if (!obj) throw new Error("Resource not found");
+            docURI = obj._self;
+        }
+
+        // use deleteDocument to delete by URI (retry on 404 a few times)
+        let tryDelete = (callback: (err: any, result: any) => void) =>
+            this.database.client.log("Deleting: " + (id || "<no ID>")) &&
+            this.database.client.documentClient.deleteDocument(
+                docURI!, options, callback);
+        await curryPromise(tryDelete, this.database.client.timeout,
+            maxRetries, 500, true)();
+    }
+
+    /** @internal Helper function that returns a document URI for given ID or object */
+    private _getDocURI(v: string | { id?: string, _self?: string }): string {
+        if (typeof v !== "string") {
+            if (v._self) return v._self;
+            v = String(v.id || "");
+        }
+        var chars = /[\/\\\?#]/;
+        if (!v || chars.test(<string>v) || chars.test(this.id))
+            throw new Error("Invalid resource ID: " + JSON.stringify(v));
+        return "dbs/" + this.database.id +
+            "/colls/" + this.id +
+            "/docs/" + <string>v;
     }
 
     /** @internal Self link */
-    private _self: string;
+    private _self?: string;
 
     /** @internal Offer link, if known */
-    private _offer: _DocumentDB.OfferResource;
+    private _offer?: _DocumentDB.OfferResource;
 }
-
-/** Modes that can be used for storing resources in a collection */
-export enum StoreMode { Upsert, CreateOnly, UpdateOnly, UpdateOnlyIfNoChange };

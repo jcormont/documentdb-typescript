@@ -1,8 +1,13 @@
 {
   "name": "documentdb-typescript",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "description": "TypeScript API for Microsoft Azure DocumentDB",
-  "keywords": ["DocumentDB", "DocDB", "Azure", "TypeScript"],
+  "keywords": [
+    "DocumentDB",
+    "DocDB",
+    "Azure",
+    "TypeScript"
+  ],
   "main": "./dist/index.js",
   "typings": "./typings/index.d.ts",
   "scripts": {
@@ -21,5 +26,9 @@
   "homepage": "https://github.com/jcormont/documentdb-typescript#readme",
   "dependencies": {
     "documentdb": "^1.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^7.0.8",
+    "typescript": "^2.1.0"
   }
 }
