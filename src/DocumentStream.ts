@@ -35,7 +35,7 @@ export class DocumentStream<T> implements AsyncIterator<T> {
     // asynchronous iterator, when that feature lands in TypeScript 2.3 (?),
     // i.e. we just need [Symbol.asyncIterator] = () => this
     /** Get the next result (asynchronously), if any; promise resolves to a `{ value, done }` pair, or is rejected if an error occurred; subsequent calls to this function will return promises for results after the current result (i.e. requests are queued) */
-    public async next(): Promise<{ value: T, done: false} | { value: any, done: true}> {
+    public async next(): Promise<{ value: T, done: false } | { value: any, done: true }> {
         var qi = this._qi || (this._qi = await this._qiP);
         var readNextAsync = curryPromise<T>(qi.nextItem.bind(qi), this.timeout, 0, 100);
         var next: T = await (this._nextP = this._nextP.then(() =>
@@ -83,7 +83,7 @@ export class DocumentStream<T> implements AsyncIterator<T> {
     }
 
     /** Load all results into an array */
-    public async toArray() {
+    public async toArray(): Promise<T[]> {
         var qi = this._qi || (this._qi = await this._qiP);
         var readArrayAsync = curryPromise<T[]>(qi.toArray.bind(qi), this.timeout, 0);
         return await (this._nextP = this._nextP.then(() =>
