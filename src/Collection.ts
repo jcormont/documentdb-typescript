@@ -258,13 +258,14 @@ export class Collection {
             parameters: []
         };
         if (obj instanceof Object) {
+            var i = 0;
             for (var prop in <{}>obj) {
                 if (Object.prototype.hasOwnProperty.call(obj, prop)) {
                     // add an exact match for this property
                     if (q.parameters.length) q.query += " and";
-                    q.query += ` c.${prop} = @_${prop}_value`;
+                    q.query += ` c[${JSON.stringify(prop)}] = @_value_${++i}`;
                     q.parameters.push({
-                        name: "@_" + prop + "_value",
+                        name: "@_value_" + i,
                         value: obj[prop]
                     });
                 }
@@ -309,13 +310,14 @@ export class Collection {
             q.parameters.push({ name: "@id", value: obj });
         }
         else if (obj instanceof Object) {
+            var i = 0;
             for (var prop in <{}>obj) {
                 if (Object.prototype.hasOwnProperty.call(obj, prop)) {
                     // add an exact match for this property
                     if (q.parameters.length) q.query += " and";
-                    q.query += ` c.${prop} = @_${prop}_value`;
+                    q.query += ` c[${JSON.stringify(prop)}] = @_value_${++i}`;
                     q.parameters.push({
-                        name: "@_" + prop + "_value",
+                        name: "@_value_" + i,
                         value: obj[prop]
                     });
                 }
