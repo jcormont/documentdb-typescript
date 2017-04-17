@@ -221,7 +221,7 @@ export class Collection {
     public async findDocumentAsync<ResultT extends {}>(doc: { _self: string },
         maxRetries?: number, options?: AllOptions):
         Promise<ResultT & _DocumentDB.DocumentResource>;
-    /** Find the document with the same `id` property as given object, or the latest document with exactly the same values for all given properties if `id` is not set */
+    /** Find the document with exactly the same values for all properties (i.e. where _all_ own properties of the given object match exactly) */
     public async findDocumentAsync<ResultT extends {}>(obj: Partial<ResultT>,
         maxRetries?: number, options?: AllOptions):
         Promise<ResultT & _DocumentDB.DocumentResource>;
@@ -232,19 +232,29 @@ export class Collection {
 
         // read using readDocument if possible
         if (typeof obj === "string" ||
-            obj && (typeof (<any>obj)._self === "string" ||
-                (typeof (<any>obj).id === "string"))) {
+            obj && (typeof obj._self === "string" ||
+                (typeof obj.id === "string"))) {
             var docURI: string | undefined;
             try { docURI = this._getDocURI(obj) } catch (all) { }
             if (docURI) {
                 // if got a well-formed URI, go ahead (and retry on 404, for
                 // lower consistency modes)
-                let tryReload = (callback: (err: any, result: any) => void) =>
+                let tryReadDoc = (callback: (err: any, result: any) => void) =>
                     this.database.client.log("Reading document " + docURI) &&
                     this.database.client.documentClient.readDocument(
                         docURI!, options, callback);
-                return await curryPromise<any>(tryReload,
+                let result = await curryPromise<any>(tryReadDoc,
                     this.database.client.timeout, maxRetries, undefined, true)();
+                if (typeof obj !== "string" && !obj._self) {
+                    // check that other properties match, too
+                    for (var prop in <{}>obj) {
+                        if (Object.prototype.hasOwnProperty.call(obj, prop)) {
+                            if (obj[prop] !== result[prop])
+                                throw new Error("Resource not found");
+                        }
+                    }
+                }
+                return result;
             }
             else if (typeof obj === "string") {
                 // select by ID property (e.g. when contains spaces)
@@ -374,7 +384,7 @@ export class Collection {
     /** Delete the document with given ID */
     public async deleteDocumentAsync(id: string,
         maxRetries?: number, options?: AllOptions): Promise<void>;
-    /** Delete the given document (must have a `_self` property, e.g. the result of `storeDocumentAsync` or `findDocumentAsync`, OR a valid `id` property) */
+    /** Delete the given document (must have a `_self` property, e.g. the result of `storeDocumentAsync` or `findDocumentAsync`, OR a valid `id` property, note that other properties are NOT matched against the document to be deleted) */
     public async deleteDocumentAsync(doc: { _self: string } | { id: string },
         maxRetries?: number, options?: AllOptions): Promise<void>;
     public async deleteDocumentAsync(v: string | { id?: string, _self?: string },
