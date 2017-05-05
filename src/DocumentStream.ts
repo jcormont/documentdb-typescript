@@ -2,14 +2,11 @@ import * as _DocumentDB from "./_DocumentDB";
 import { Collection } from "./Collection";
 import { curryPromise } from "./Util";
 
-export interface AsyncIterator<T> {
-    next(value?: any): Promise<IteratorResult<T>>;
-    return?(value?: any): Promise<IteratorResult<T>>;
-    throw?(e?: any): Promise<IteratorResult<T>>;
-}
+// polyfill Symbol.asyncIterator
+(<any>Symbol).asyncIterator = (<any>Symbol).asyncIterator || Symbol("Symbol.asyncIterator");
 
 /** Represents asynchronously loaded query result sets as a stream; the type parameter represents the query result type, i.e. a full document resource type for `SELECT * FROM` queries, an object with only projected properties for `SELECT x, y, ... FROM` queries, or even a scalar value for `SELECT VALUE ... FROM` queries */
-export class DocumentStream<T> implements AsyncIterator<T> {
+export class DocumentStream<T> implements AsyncIterable<T> {
     /** @internal create a document stream from a query iterator promise */
     public static create<T>(_collection: Collection, _uid: number,
         _qiP: Promise<_DocumentDB.QueryIterator<T>>) {
@@ -31,9 +28,9 @@ export class DocumentStream<T> implements AsyncIterator<T> {
         return nextResult.done ? null : nextResult.value!;
     }
 
-    // TODO: the following method can be used to turn this object into an ES6
-    // asynchronous iterator, when that feature lands in TypeScript 2.3 (?),
-    // i.e. we just need [Symbol.asyncIterator] = () => this
+    /** This property makes the entire instance usable as an async iterator */
+    [Symbol.asyncIterator] = () => this;
+
     /** Get the next result (asynchronously), if any; promise resolves to a `{ value, done }` pair, or is rejected if an error occurred; subsequent calls to this function will return promises for results after the current result (i.e. requests are queued) */
     public async next(): Promise<{ value: T, done: false } | { value: any, done: true }> {
         var qi = this._qi || (this._qi = await this._qiP);

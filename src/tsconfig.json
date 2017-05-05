@@ -3,6 +3,7 @@
         "declaration": true,
         "declarationDir": "../typings",
         "target": "es6",
+        "lib": [ "esnext", "esnext.asynciterable" ],
         "module": "commonjs",
         "strictNullChecks": true,
         "noImplicitAny": true,

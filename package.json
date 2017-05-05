@@ -9,7 +9,7 @@
     "TypeScript"
   ],
   "main": "./dist/index.js",
-  "typings": "./typings/index.d.ts",
+  "typings": "./typings-compat.d.ts",
   "scripts": {
     "build": "tsc -p src",
     "prepublish": "tsc -p src"
@@ -29,6 +29,6 @@
   },
   "devDependencies": {
     "@types/node": "^7.0.8",
-    "typescript": "^2.1.0"
+    "typescript": "^2.3.0"
   }
 }
