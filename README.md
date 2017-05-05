@@ -19,6 +19,10 @@ This module was written with the following goals in mind:
 
 ### Change Log
 
+**v1.0.3:**
+
+* _New:_ Added support for Typescript 2.3's `for await (... of ...)` syntax (without breaking support for ES < 6 and TS < 2.3). See example below.
+
 **v1.0.0:**
 
 * _Important:_ This version now requires TypeScript 2.1+.
@@ -268,6 +272,10 @@ async function main(url, masterKey) {
 ## Iterating over query results
 The `queryDocuments` method on the `Collection` class is one of the few methods that does *not* return a Promise. Instead, it returns a `DocumentStream` instance which can be used to iterate over the results or load them all in one go.
 
+The `DocumentStream` class exposes a number of methods (e.g. `forEach` and `mapAsync`)
+
+If you do not wish to use the Typescript/ES6 `await` keyword, you can use the `Promise` object returned by `next`, `read`, `forEach`, or `mapAsync` instead.
+
 ```typescript
 // Example: iterate over query results
 async function main(url, masterKey) {
@@ -277,13 +285,21 @@ async function main(url, masterKey) {
     // load all documents into an array
     var allDocs = await coll.queryDocuments().toArray();
 
-    // read all results in a loop (with type hint)
+    // the hard way: read all results in a loop (with type hint)
     type FooResult = { foo: string };
     var stream = coll.queryDocuments<FooResult>("select c.foo from c");
     while (true) {
         var it = await stream.next();
         if (it.done === true) break;
         console.log(it.value.foo);
+    }
+
+    // explicitly reset the stream to the beginning if needed:
+    await stream.resetAsync();
+
+    // the **new** way (Typescript 2.3): for await ... of
+    for await (const doc of stream) {
+        console.log(doc.foo);
     }
 
     // ... or use the forEach method
@@ -295,8 +311,8 @@ async function main(url, masterKey) {
     // ... or map all results to another array
     var ids = await stream.mapAsync(doc => doc.id);
     console.log(ids);
-    
-    // get only the newest time stamp
+
+    // use `top 1` to get only the newest time stamp
     var newest = await coll.queryDocuments(
         "select top 1 c._ts from c order by c._ts desc")
         .read();
@@ -306,5 +322,14 @@ async function main(url, masterKey) {
         console.log("Last change " +
             (Date.now() / 1000 - newest._ts) +
             "s ago");
+
+    // ... or without `await`:
+    coll.queryDocuments(
+        "select top 1 c._ts from c order by c._ts desc")
+        .read()
+        .then(newest => {
+            if (!newest) console.log("No documents");
+            else console.log("Last change" /* + ... */);
+        });
 }
 ```
