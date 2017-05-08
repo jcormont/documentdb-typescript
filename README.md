@@ -289,9 +289,9 @@ async function main(url, masterKey) {
     type FooResult = { foo: string };
     var stream = coll.queryDocuments<FooResult>("select c.foo from c");
     while (true) {
-        var it = await stream.next();
-        if (it.done === true) break;
-        console.log(it.value.foo);
+        var { done, value } = await stream.next();
+        if (done) break;
+        console.log(value.foo);
     }
 
     // explicitly reset the stream to the beginning if needed:
