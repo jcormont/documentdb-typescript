@@ -1,12 +1,12 @@
-# Azure DocumentDB TypeScript API
+# Azure Cosmos DB (DocumentDB API) TypeScript interface
 
-This Node.js module provides the 'missing' TypeScript 2 API for Microsoft's awesome SQL-queried schema-free NoSQL database in the Azure cloud, DocumentDB.
+This Node.js module provides a TypeScript-based wrapper around the Node.js APIs for Microsoft's awesome SQL-queried schema-free NoSQL database in the Azure cloud, ~~DocumentDB~~ Cosmos DB.
 
-Refer to the DocumentDB documentation here: https://docs.microsoft.com/en-us/azure/documentdb/
+Refer to the DocumentDB API documentation here: https://docs.microsoft.com/en-us/azure/documentdb/documentdb-sdk-node
 
-**No TypeScript required** &mdash; you can use this module with plain JavaScript too (ES3, ES5, or ES6 aka ES2015 and whatever comes after), and enjoy enhanced Intellisense in an editor that supports TypeScript 2 definition files, such as VS Code.
+**No TypeScript required** &mdash; you can use this module with plain JavaScript too (ES3, ES5, or ES6 aka ES2015, ES7 and whatever comes after), and enjoy enhanced Intellisense in an editor that supports TypeScript 2 definition files, such as VS Code.
 
-> **NOTE:** The author of this module is _not_ affiliated with Microsoft, Azure, or Document DB.
+> **NOTE:** The author of this module is _not_ affiliated with Microsoft, Azure, or Cosmos DB / Document DB.
 
 ### Goals
 This module was written with the following goals in mind:
@@ -38,7 +38,7 @@ This module was written with the following goals in mind:
 
 **Note:**
 
-At this point parts of the DocumentDB feature set are still missing. If your app needs stored procedures, or users and permissions, for example, then please add to this code (preferably as new classes). Pull requests are greatly appreciated!
+At this point parts of the DocumentDB API feature set are still missing. If your app needs stored procedures, or users and permissions, for example, then please add to this code (preferably as new classes). Pull requests are greatly appreciated!
 
 Tests are sorely needed as well. Perhaps some of the tests can be ported over from DocumentDB itself.
 
@@ -67,7 +67,7 @@ const client = new Client(/*...*/);
 ## Usage
 
 This module exports only the following symbols:
-- `Client` class: contains methods for dealing with the connection to DocumentDB account.
+- `Client` class: contains methods for dealing with the connection to ~~DocumentDB~~ Cosmos DB account.
 - `Database` class: represents a database.
 - `Collection` class: represents a collection, and contains methods for dealing with documents.
 - `DocumentStream` class: contains methods for reading query results (used as a return type only).
