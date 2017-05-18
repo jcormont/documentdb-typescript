@@ -19,6 +19,14 @@ This module was written with the following goals in mind:
 
 ### Change Log
 
+**v1.0.5:**
+
+* _Update:_ DocumentDB Node.js API v1.12.0 for Cosmos DB, with support for RU/min billing and ConsistentPrefix consistency level.
+
+**v1.0.4:**
+
+* Minor bug fix
+
 **v1.0.3:**
 
 * _New:_ Added support for Typescript 2.3's `for await (... of ...)` syntax (without breaking support for ES < 6 and TS < 2.3). See example below.
