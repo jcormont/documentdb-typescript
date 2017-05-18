@@ -200,7 +200,7 @@ export interface OfferResource extends Resource {
 }
 
 /** Consistency level constants */
-export type ConsistencyLevel = "Strong" | "BoundedStaleness" | "Session" | "Eventual";
+export type ConsistencyLevel = "Strong" | "BoundedStaleness" | "Session" | "Eventual" | "ConsistentPrefix";
 
 /** Query type: either a plain string or a structure with parameters */
 export type SqlQuery = string | {
@@ -268,6 +268,8 @@ export interface RequestOptions {
     sessionToken?: string;
     resourceTokenExpirySeconds?: number;
     offerType?: string;
+    offerEnableRUPerMinuteThroughput?: boolean;
+    disableRUPerMinuteUsage?: boolean;
     offerThroughput?: number;
     partitionKey?: {};
     disableAutomaticIdGeneration?: boolean;
