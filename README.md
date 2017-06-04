@@ -19,6 +19,10 @@ This module was written with the following goals in mind:
 
 ### Change Log
 
+**v1.0.6:**
+
+* Fixed an issue with the asyncIterator polyfill
+
 **v1.0.5:**
 
 * _Update:_ DocumentDB Node.js API v1.12.0 for Cosmos DB, with support for RU/min billing and ConsistentPrefix consistency level.

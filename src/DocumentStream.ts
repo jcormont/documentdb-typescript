@@ -4,7 +4,7 @@ import { curryPromise } from "./Util";
 
 // polyfill Symbol.asyncIterator
 if (!(<any>Symbol).asyncIterator) {
-    (<any>Symbol).asyncIterator = (<any>Symbol).asyncIterator || Symbol("Symbol.asyncIterator");
+    (<any>Symbol).asyncIterator = Symbol("Symbol.asyncIterator");
 }
 
 /** Represents asynchronously loaded query result sets as a stream; the type parameter represents the query result type, i.e. a full document resource type for `SELECT * FROM` queries, an object with only projected properties for `SELECT x, y, ... FROM` queries, or even a scalar value for `SELECT VALUE ... FROM` queries */
