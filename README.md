@@ -99,11 +99,12 @@ async function main(url, masterKey) {
     // enable logging of all operations to the console
     client.enableConsoleLog = true;
 
+    // open the connection and print a list of IDs
+    await client.openAsync();
+
     // dump the account information
     console.log(await client.getAccountInfoAsync());
 
-    // open the connection and print a list of IDs
-    await client.openAsync();
     var dbs = await client.listDatabasesAsync();
     console.log(dbs.map(db => db.id));
 
