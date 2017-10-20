@@ -101,12 +101,11 @@ async function main(url, masterKey) {
 
     // open the connection and print a list of IDs
     await client.openAsync();
+    var dbs = await client.listDatabasesAsync();
+    console.log(dbs.map(db => db.id));
 
     // dump the account information
     console.log(await client.getAccountInfoAsync());
-
-    var dbs = await client.listDatabasesAsync();
-    console.log(dbs.map(db => db.id));
 
     // unnecessary unless you expect new clients
     // to reopen the connection:
