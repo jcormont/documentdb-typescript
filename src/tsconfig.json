@@ -5,12 +5,7 @@
         "target": "es6",
         "lib": [ "esnext", "esnext.asynciterable" ],
         "module": "commonjs",
-        "strictNullChecks": true,
-        "noImplicitAny": true,
-        "noImplicitReturns": true,
-        "noImplicitThis": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
+        "strict": true,
         "stripInternal": true,
         "outDir": "../dist"
     }

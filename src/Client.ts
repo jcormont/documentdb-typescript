@@ -86,7 +86,7 @@ export class Client {
         if (forceReload) {
             // create new promise for list of DB resources
             this._databaseResources =
-                new Promise<_DocumentDB.Resource[]>(resolve => {
+                new Promise<_DocumentDB.DatabaseResource[]>(resolve => {
                     this._resolve_databases = resolve;
                 });
 

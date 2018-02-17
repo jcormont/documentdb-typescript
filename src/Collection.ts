@@ -169,7 +169,7 @@ export class Collection {
 
     /** Create or update the document with given data (must include an `.id` or `._self` property if store mode is `UpdateOnly`, and must also include an `_etag` property if store mode is `UpdateOnlyIfNoChange`); returns the stored data as a plain object, including meta properties such as `._etag` and `._self` */
     public async storeDocumentAsync<T extends Partial<_DocumentDB.DocumentResource>>(
-        data: T,
+        data: T & object,
         mode?: StoreMode, maxRetries?: number, options?: AllOptions):
         Promise<T & _DocumentDB.DocumentResource> {
         await this.openAsync();
@@ -222,7 +222,7 @@ export class Collection {
         maxRetries?: number, options?: AllOptions):
         Promise<ResultT & _DocumentDB.DocumentResource>;
     /** Find the document with exactly the same values for all properties (i.e. where _all_ own properties of the given object match exactly) */
-    public async findDocumentAsync<ResultT extends {}>(obj: Partial<ResultT>,
+    public async findDocumentAsync<ResultT extends {}>(obj: Partial<ResultT> & object,
         maxRetries?: number, options?: AllOptions):
         Promise<ResultT & _DocumentDB.DocumentResource>;
     public async findDocumentAsync(

@@ -59,7 +59,7 @@ export class DocumentStream<T> implements AsyncIterable<T> {
     }
 
     /** Call a function for each result; returns a promise for an array with all return values, which is resolved only when all results have been processed, or is rejected if the callback throws an error */
-    public async mapAsync(f: (doc: T) => void) {
+    public async mapAsync<ResultT>(f: (doc: T) => ResultT) {
         var result = [];
         while (true) {
             var n = await this.next();
@@ -76,7 +76,7 @@ export class DocumentStream<T> implements AsyncIterable<T> {
 
     /** Reset the stream to the beginning of the set (asynchronously, i.e. after all queued operations have completed) */
     public resetAsync() {
-        this._nextP.then(() => {
+        return this._nextP.then(() => {
             this._qi && this._qi.reset();
         });
     }

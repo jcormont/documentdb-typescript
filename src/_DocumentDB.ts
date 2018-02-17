@@ -230,7 +230,9 @@ export interface ConnectionPolicy {
         MaxRetryAttemptCount?: number;
         FixedRetryIntervalInMilliseconds?: number;
         MaxWaitTimeInSeconds?: number;
-    }
+    };
+    DisableSSLVerification?: boolean;
+    ProxyUrl?: string;
 }
 
 /** DocumentClient indexing policy interface */

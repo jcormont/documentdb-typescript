@@ -1,4 +1,4 @@
-# Azure Cosmos DB (DocumentDB API) TypeScript interface
+# Azure Cosmos DB (DocumentDB SQL API) TypeScript interface
 
 This Node.js module provides a TypeScript-based wrapper around the Node.js APIs for Microsoft's awesome SQL-queried schema-free NoSQL database in the Azure cloud, ~~DocumentDB~~ Cosmos DB.
 
@@ -18,6 +18,11 @@ This module was written with the following goals in mind:
 - Enable asynchronous programming with `async/await` and/or Promises (native Node JS).
 
 ### Change Log
+
+**v1.0.7**
+
+* _Update:_ CosmosDB Node.js API v1.14, with Session consistency, DisableSSLVerification and ProxyURL options.
+* Fixed several typing issues that occur with newer TypeScript compilers.
 
 **v1.0.6:**
 
